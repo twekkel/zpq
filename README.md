@@ -21,18 +21,13 @@ Usage: zpq [-cdfhkLlNnqVv] [-z METHOD] [file ...]
                      (default -z4)
 ```
 
-Thin wrapper around libzpaq; libzpaq (from ../zpaqf, with its bundled
-libdivsufsort replaced by libsais from ../libsais), liblzma
-(byte-identical to ../7zip/C) and libsais are vendored in `lib/`, so
-this directory builds standalone.
-I/O streams through libzpaq's Reader/Writer, so memory is bounded by the
-zpaq block size (2^N MiB), not by the input size.
+`zpq` is a file compression tool built around the **zpaq** architecture, featuring a traditional gzip/xz/zstd-style command-line interface.
 
-The default is `-z4` (zpaqf level 4, 2^6 MiB blocks), which libzpaq
-expands per block; measured on liberty2.log, level 4 gives 0.0201 at
-1.3 MB/s while level 5 (`-z5`) reaches 0.0178 at only 0.6 MB/s. A full
-libzpaq `"x..."` method string works too. Method strings are documented
-in `lib/libzpaq.h`; a few examples:
+It prioritizes maximum compression density over speed.
+
+Additional features:
+ * libsais replaces libdivsufsort
+ * liblzma is included from zpaqf
 
 ```
 zpq -z 0 big.bin                           # store only
@@ -50,41 +45,25 @@ F = 0 none / 1 E8E9 / 2 WBPE, G = WBPE capital transform 0/1.
 
 ## Benchmark
 
-~1.4 GB log (10M lines from [supercomputer log](https://www.usenix.org/cfdr-data#hpc4)), single thread, x86-64 Linux build. Other tools shown for comparison
+~14 MB log (100k lines from [supercomputer log](https://www.usenix.org/cfdr-data#hpc4)), single thread, x86-64 Linux build. Other tools shown for comparison
 zpq rows at the bottom. Numbers are machine-dependent.
 
 | Configuration                                 | c/d |  Wall(s) |  User(s) |   Sys(s) |   Memory(MB) |  Size(bytes) |   Ratio(%) |
 |-----------------------------------------------|-----|----------|----------|----------|--------------|--------------|------------|
-| lz4 -1                                        | c   |     2.29 |     2.43 |     0.52 |         31.9 |     74130923 |       5.23 |
-| lz4 -1                                        | d   |     0.89 |     0.88 |     0.04 |         32.0 |            - |          - |
-| flzp                                          | c   |     1.94 |     1.73 |     0.29 |          9.9 |     47047264 |       3.32 |
-| flzp                                          | d   |     1.13 |     1.13 |     0.01 |          9.5 |            - |          - |
-| zstd -3                                       | c   |     0.77 |     0.83 |     0.35 |         39.0 |     45472775 |       3.21 |
-| zstd -3                                       | d   |     0.32 |     0.32 |     0.01 |          7.5 |            - |          - |
-| gzip -6                                       | c   |     3.76 |     3.67 |     0.33 |          7.4 |     40599414 |       2.87 |
-| gzip -6                                       | d   |     0.43 |     0.42 |     0.01 |          7.5 |            - |          - |
-| zstd -11                                      | c   |     6.34 |     6.41 |     0.40 |         90.9 |     30219009 |       2.13 |
-| zstd -11                                      | d   |     0.22 |     0.24 |     0.00 |          8.4 |            - |          - |
-| flzp + gzip                                   | c   |     2.33 |     3.45 |     0.29 |          9.8 |     16002356 |       1.13 |
-| flzp + gzip                                   | d   |     1.18 |     1.32 |     0.00 |          9.6 |            - |          - |
-| kanzi -c -b64M -j 1 -t lzpx -e tpaq           | c   |    12.30 |    11.23 |     1.19 |        109.7 |      9376559 |       0.66 |
-| kanzi -c -b64M -j 1 -t lzpx -e tpaq           | d   |    11.93 |    11.17 |     0.74 |        111.5 |            - |          - |
-| kanzi -c -b64M -j 1 -t lzpx -e tpaqx          | c   |    18.52 |    14.90 |     3.72 |        359.4 |      9203874 |       0.65 |
-| kanzi -c -b64M -j 1 -t lzpx -e tpaqx          | d   |    17.75 |    14.49 |     3.21 |        360.9 |            - |          - |
-| flzp + zpq                                    | c   |    24.43 |    24.18 |     0.32 |        361.0 |      8474774 |       0.60 |
-| flzp + zpq                                    | d   |    23.85 |    25.54 |     0.04 |        314.5 |            - |          - |
-| flzp -B28 + zpq -z511                         | c   |    56.80 |    56.47 |     0.37 |        814.6 |      7897042 |       0.56 |
-| flzp -B28 + zpq -z511                         | d   |    56.30 |    58.03 |     0.11 |        768.6 |            - |          - |
-| flzp + ppmd                                   | c   |     3.06 |     4.38 |     0.33 |         17.8 |     10909404 |       0.77 |
-| flzp + ppmd                                   | d   |     2.90 |     3.95 |     0.01 |         17.7 |            - |          - |
-| flzp -B28 + ppmd -o8                          | c   |     3.42 |     4.82 |     0.37 |        262.0 |     10819851 |       0.76 |
-| flzp -B28 + ppmd -o8                          | d   |     3.27 |     4.38 |     0.01 |        261.8 |            - |          - |
-| flzp + bzip3                                  | c   |     4.91 |     4.68 |     0.30 |        100.3 |     10105572 |       0.71 |
-| flzp + bzip3                                  | d   |     4.67 |     4.66 |     0.01 |        100.9 |            - |          - |
-| flzp + xz                                     | c   |     8.67 |    18.16 |     0.39 |        256.2 |     12784860 |       0.90 |
-| flzp + xz                                     | d   |     1.19 |     1.52 |     0.01 |         75.5 |            - |          - |
-| flzp -B28 + xz -9e                            | c   |    16.56 |    18.29 |     0.34 |        532.2 |     12595712 |       0.89 |
-| flzp -B28 + xz -9e                            | d   |     1.24 |     1.54 |     0.03 |        261.8 |            - |          - |
+| lz4                                           | c   |     0.03 |     0.02 |     0.02 |         18.2 |      1394671 |       9.72 |
+| lz4                                           | d   |     0.02 |     0.02 |     0.00 |         18.1 |            - |          - |
+| gzip                                          | c   |     0.11 |     0.11 |     0.00 |          7.4 |       836843 |       5.83 |
+| gzip                                          | d   |     0.01 |     0.01 |     0.00 |          7.4 |            - |          - |
+| zstd                                          | c   |     0.03 |     0.03 |     0.01 |         21.0 |       816004 |       5.69 |
+| zstd                                          | d   |     0.01 |     0.01 |     0.00 |          7.4 |            - |          - |
+| zstd -11                                      | c   |     0.29 |     0.28 |     0.02 |         40.7 |       668096 |       4.66 |
+| zstd -11                                      | d   |     0.01 |     0.01 |     0.00 |          7.8 |            - |          - |
+| xz                                            | c   |     2.97 |     2.95 |     0.03 |        114.8 |       533844 |       3.72 |
+| xz                                            | d   |     0.04 |     0.04 |     0.00 |         28.3 |            - |          - |
+| zpq                                           | c   |    10.56 |    10.52 |     0.03 |        104.8 |       275553 |       1.92 |
+| zpq                                           | d   |    10.58 |    10.56 |     0.01 |         90.5 |            - |          - |
+| zpq -z511                                     | c   |    31.39 |    31.30 |     0.03 |        288.5 |       237553 |       1.66 |
+| zpq -z511                                     | d   |    31.27 |    31.20 |     0.02 |        274.8 |            - |          - |
 
 Build and test:
 
