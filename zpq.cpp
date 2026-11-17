@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -91,7 +92,7 @@ public:
   void write(const char*, int len) { n += (unsigned)len; }
 };
 
-/* captures the segment file name, for -l */
+/* captures a segment string (file name or comment) */
 class NameWriter: public libzpaq::Writer {
   char buf[4096];
 public:
@@ -256,21 +257,55 @@ static int process(const char *in, const char *out, const char *method) {
 
   FileReader r(fi);
   FileWriter w(fo);
+  struct stat st;
+  bool have_st = in && fstat(fileno(fi), &st) == 0 && S_ISREG(st.st_mode);
+  /* metadata goes in the segment comment: "mode atime mtime" */
+  unsigned out_mode = 0;
+  struct timespec out_times[2];
+  bool have_meta = false;
   if (opt.decompress) {
-    libzpaq::decompress(&r, &w);
+    libzpaq::Decompresser d;
+    d.setInput(&r);
+    d.setOutput(&w);
+    NameWriter cw;
+    while (d.findBlock()) {
+      while (d.findFilename()) {
+        cw.reset();
+        d.readComment(&cw);
+        d.decompress();
+        d.readSegmentEnd();
+        unsigned m;
+        long long as, ms;
+        long an, mn;
+        /* libzpaq prefixes the comment with the uncompressed size */
+        if (sscanf(cw.name(), "%*d %o %lld %ld %lld %ld",
+                   &m, &as, &an, &ms, &mn) == 5) {
+          out_mode = m;
+          out_times[0].tv_sec = (time_t)as;
+          out_times[0].tv_nsec = an;
+          out_times[1].tv_sec = (time_t)ms;
+          out_times[1].tv_nsec = mn;
+          have_meta = true;
+        }
+      }
+    }
   } else {
     const char *base = NULL;
     if (in && !opt.noname) {  /* -n: store no name in the archive */
       const char *slash = strrchr(in, '/');
       base = slash ? slash + 1 : in;
     }
-    libzpaq::compress(&r, &w, method, base);
+    char comment[64] = "";
+    if (have_st)
+      snprintf(comment, sizeof comment, "%o %lld %ld %lld %ld",
+               st.st_mode & 07777,
+               (long long)st.st_atim.tv_sec, (long)st.st_atim.tv_nsec,
+               (long long)st.st_mtim.tv_sec, (long)st.st_mtim.tv_nsec);
+    libzpaq::compress(&r, &w, method, base, comment);
   }
 
   long long isize = -1;
-  struct stat st;
-  if (in && fstat(fileno(fi), &st) == 0 && S_ISREG(st.st_mode))
-    isize = (long long)st.st_size;
+  if (have_st) isize = (long long)st.st_size;
 
   int rc = 0;
   /* fgetc/fread return EOF on error too, so libzpaq sees a read error as
@@ -288,6 +323,11 @@ static int process(const char *in, const char *out, const char *method) {
   if (fi != stdin && fclose(fi) != 0) {
     if (!rc) fprintf(stderr, "%s: %s: read error\n", progname, in);
     rc = 1;
+  }
+  /* after fclose(fo) so the writes cannot clobber the restored times */
+  if (rc == 0 && out && have_meta) {
+    chmod(out, out_mode & 07777);
+    utimensat(AT_FDCWD, out, out_times, 0);
   }
   partial_output = NULL;
   if (rc == 0 && opt.verbose)
