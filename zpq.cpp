@@ -216,7 +216,10 @@ static int test_archive(const char *name) {
       d.readComment();
       d.decompress();
       d.readSegmentEnd(sha1result);
-      if (sha1result[0] && memcmp(sha1result + 1, sha1.result(), 20)) {
+      if (!sha1result[0]) {
+        fprintf(stderr, "%s: %s: no SHA-1 checksum\n", progname, name ? name : "stdin");
+        rc = 1;
+      } else if (memcmp(sha1result + 1, sha1.result(), 20)) {
         fprintf(stderr, "%s: %s: SHA-1 mismatch\n", progname, name ? name : "stdin");
         rc = 1;
       }
