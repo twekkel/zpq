@@ -270,11 +270,22 @@ static int process(const char *in, const char *out, const char *method) {
     isize = (long long)st.st_size;
 
   int rc = 0;
-  if (ferror(fo) || (fo == stdout ? fflush(stdout) : fclose(fo)) != 0) {
+  /* fgetc/fread return EOF on error too, so libzpaq sees a read error as
+   * end of file; without this check the caller would unlink the original */
+  if (ferror(fi)) {
+    fprintf(stderr, "%s: %s: read error\n", progname, in ? in : "stdin");
+    rc = 1;
+  }
+  int werr = ferror(fo);  /* check before fclose invalidates the stream */
+  int wrc = fo == stdout ? fflush(stdout) : fclose(fo);
+  if (werr || wrc != 0) {
     fprintf(stderr, "%s: %s: write error\n", progname, out ? out : "stdout");
     rc = 1;
   }
-  if (fi != stdin) fclose(fi);
+  if (fi != stdin && fclose(fi) != 0) {
+    if (!rc) fprintf(stderr, "%s: %s: read error\n", progname, in);
+    rc = 1;
+  }
   partial_output = NULL;
   if (rc == 0 && opt.verbose)
     fprintf(stderr, "%s:\t%lld -> %llu bytes\n", in ? in : "stdin", isize, w.count);
