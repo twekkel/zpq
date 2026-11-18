@@ -1,4 +1,4 @@
-# zpq - simple zpaq (libzpaq) compressor
+# zpq - a libzpaq based compressor (no archiving)
 
 ```
 zpq 0.9.1 (libzpaq) compressor
@@ -13,12 +13,12 @@ Usage: zpq [-cdfhkLlNnqVv] [-m METHOD] [file ...]
   -L, --license      display software license
   -n, --no-name      do not store the original file name in the archive
   -N, --name         store the original file name in the archive (default)
+  -m, --zpaq METHOD  zpaq method: level 0..5 or libzpaq "x..." string
+                     (default -m4)
   -q, --quiet        suppress warnings
   -t, --test         test archive integrity (SHA-1)
   -v, --verbose      verbose mode
   -V, --version      display version number
-  -m, --zpaq METHOD  zpaq method: level 0..5 or libzpaq "x..." string
-                     (default -m4)
 ```
 
 `zpq` is a file compression tool built around the **zpaq** architecture, featuring a traditional gzip/xz/zstd-style command-line interface.
