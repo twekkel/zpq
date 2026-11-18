@@ -108,7 +108,7 @@ static void usage(FILE *f) {
   fprintf(f,
     "%s %s (libzpaq) compressor\n"
     "\n"
-    "Usage: %s [-cdfhkLlNnqVv] [-z METHOD] [file ...]\n"
+    "Usage: %s [-cdfhkLlNnqVv] [-m METHOD] [file ...]\n"
     "  -c, --stdout       write to stdout, keep input files\n"
     "  -d, --decompress   decompress\n"
     "  -f, --force        overwrite output files, allow terminal I/O\n"
@@ -122,8 +122,8 @@ static void usage(FILE *f) {
     "  -t, --test         test archive integrity (SHA-1)\n"
     "  -v, --verbose      verbose mode\n"
     "  -V, --version      display version number\n"
-    "  -z, --zpaq METHOD  zpaq method: level 0..5 or libzpaq \"x...\" string\n"
-    "                     (default -z4)\n"
+    "  -m, --zpaq METHOD  zpaq method: level 0..5 or libzpaq \"x...\" string\n"
+    "                     (default -m4)\n"
     "\n"
     "With no FILE, or when FILE is -, read standard input.\n",
     progname, ZPQ_VERSION, progname);
@@ -351,14 +351,14 @@ int main(int argc, char **argv) {
     {"name",       no_argument,       0, 'N'},
     {"quiet",      no_argument,       0, 'q'},
     {"verbose",    no_argument,       0, 'v'},
-    {"zpaq",       required_argument, 0, 'z'},
+    {"zpaq",       required_argument, 0, 'm'},
     {"help",       no_argument,       0, 'h'},
     {"version",    no_argument,       0, 'V'},
     {0, 0, 0, 0}
   };
 
   int o;
-  while ((o = getopt_long(argc, argv, "cdfhkLlNnqtVvz:", lopts, NULL)) != -1) {
+  while ((o = getopt_long(argc, argv, "cdfhkLlNnqtVvm:", lopts, NULL)) != -1) {
     switch (o) {
       case 'c': opt.tostdout = true;  break;
       case 'd': opt.decompress = true; break;
@@ -374,7 +374,7 @@ int main(int argc, char **argv) {
       case 'q': opt.quiet = true;     break;
       case 'v': opt.verbose = true;   break;
       case 'V': printf("%s %s\n", progname, ZPQ_VERSION); return 0;
-      case 'z': method = norm_method(optarg); break;
+      case 'm': method = norm_method(optarg); break;
       default:  usage(stderr); return 1;
     }
   }
